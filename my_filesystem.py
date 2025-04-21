@@ -9,7 +9,6 @@ class File:
     def write(self, new_content):
         self.content = new_content
 
-
 class Directory:
     def __init__(self, name):
         self.name = name
