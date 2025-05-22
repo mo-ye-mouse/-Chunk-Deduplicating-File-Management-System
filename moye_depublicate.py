@@ -88,6 +88,10 @@ def chunking(file_path, main_d=6, minor_d=3, r=2):
                 file.seek(start)
             # 最后的块处理
             if all_size-start < min_chunk_size:
+                sat.append(all_size-1)
+                content = file.read(all_size-start)
+                rel_hash = hash_cal(content)
+                hasher[i] = rel_hash
                 break
         return sat, hasher
 
