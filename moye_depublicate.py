@@ -1,33 +1,12 @@
 import hashlib
-import threading
+from concurrent.futures import ThreadPoolExecutor
 import os
 
 
-class MyThread(threading.Thread):
-    def __init__(self, func, args):
-        super().__init__()
-        self.func = func
-        self.args = args
-
-
 class Chunking:
-    def __init__(self, hasher=None):
+    def __init__(self, window_size=1024, max_chunk_size=4096, min_chunk_size=128, footer_size=1,
+                 main_d=6, minor_d=3, r=2):
         # 初始化超参数
-        self.window_size = 1024
-        self.max_chunk_size = 4096
-        self.min_chunk_size = 128
-        self.footer_size = 1
-        self.main_d = 6
-        self.minor_d = 3
-        self.R = 2
-        self.breakpoint = [0]
-        self.use = False
-        self.hash = hash_cal
-        if hasher is not None:
-            self.hash = hasher
-
-    def init(self, use=False, window_size=1024, max_chunk_size=4096, min_chunk_size=128, footer_size=1,
-             main_d=6, minor_d=3, r=2):
         self.window_size = window_size
         self.max_chunk_size = max_chunk_size
         self.min_chunk_size = min_chunk_size
@@ -35,99 +14,94 @@ class Chunking:
         self.main_d = main_d
         self.minor_d = minor_d
         self.R = r
-        self.use = use
+        self.breakpoint = [0]
+        self.hash = hash_cal
 
     def back_point(self):
         return self.breakpoint
 
-    def chunking(self, file_path, fs, start=0):
-        file_size = fs
+    def chunking(self, file_path, file_size, start=0):
         with open(file_path, 'rb') as f:
             start += self.min_chunk_size - self.window_size
             f.seek(start)
-            judge1 = True  # 新块判断
-            judge2 = False  # 旧块判断
+            new_chunk = True  # 新块判断
+            change_d = False
             while True:
-                if file_size < self.min_chunk_size:
-                    return None
-                elif file_size - start < self.min_chunk_size:
+                if file_size - start < self.min_chunk_size:
                     self.breakpoint.append(file_size - 1)
                     break
-                if judge1:
+                if new_chunk:
                     # 进入新块
                     content = f.read(self.window_size)
-                    judge1 = False
+                    new_chunk = False
                 else:
                     # 进入旧块，每次读取相应补偿的字节数
-                    byte = f.read(self.footer_size)
-                    content = content[self.footer_size:] + byte
+                    content = content[self.footer_size:] + f.read(self.footer_size)
                 # 计算hash值
                 hash_int = self.hash(content)
+                current_d = self.minor_d if change_d else self.main_d
                 # 判断断点*
-                if hash_int % self.main_d == self.R:
+                if hash_int % current_d == self.R:
                     self.breakpoint.append(start + self.window_size - 1)
                     start += self.min_chunk_size
-                    judge1 = True
+                    new_chunk = True
                     f.seek(start)
                 else:
                     start += self.footer_size
                     f.seek(start)
                 # 如果到达最大块尺寸，则切换除数并重新设置断点
                 if start - self.breakpoint[-1] >= self.max_chunk_size:
-                    self.main_d, self.minor_d = self.minor_d, self.main_d
-                    judge1 = True
+                    change_d = not change_d
+                    new_chunk = True
                     # 如果都无法设置断点，那么将最大块作为断点*
-                    if judge2:
+                    if change_d:
+                        start = self.breakpoint[-1] + 1 - self.window_size + self.min_chunk_size
+                        f.seek(start)
+                    else:
                         self.breakpoint.append(start + self.window_size - 1)
                         start += self.min_chunk_size
-                        judge2 = False
                         f.seek(start)
                         continue
-                    start = self.breakpoint[-1] + 1 - self.window_size + self.min_chunk_size
-                    judge2 = True
-                    f.seek(start)
 
-    def start(self, file_path, start=0):
+    def start(self, file_path):
+        # 设置线程参数
         file_size = os.path.getsize(file_path)
-        if not self.use:
+        standard_size = 1024*1024*100  # 标准分块大小
+        if file_size <= standard_size:
             self.chunking(file_path, file_size)
-        else:
-            standard_size = 1024*1024*100
-            if file_size <= standard_size:
-                self.chunking(file_path, file_size)
-            else:
-                num = file_size // standard_size
-                if file_size % standard_size != 0:
-                    num += 1
-                if num > 16:
-                    num = 16
-                chunk_size = file_size // num
-                overlap = 1024*10
-                threads = []
-                for i in range(num):
-                    start = start + i * chunk_size
-                    end = start + chunk_size + overlap
-                    if end > file_size:
-                        end = file_size
-                    part_size = end - start
-                    thread = MyThread(self.chunking, (file_path, part_size, start))
-                    threads.append(thread)
-                    thread.start()
-                for thread in threads:
-                    thread.join()
+            return
+        num = min(file_size // standard_size, 16)  # 线程数
+        chunk_num = file_size // standard_size  # 块数
+        overlap = 1024 * 10
+        # 线程池
+        with ThreadPoolExecutor(max_workers=num) as executor:
+            threads = []
+            for i in range(chunk_num):
+                start_pos = i * standard_size
+                end_pos = min(start_pos + standard_size + overlap, file_size)
+                part_size = end_pos - start_pos
+                thread = executor.submit(self.chunking, file_path, part_size, start_pos)
+                threads.append(thread)
+            # 等待所有线程结束
+            for thread in threads:
+                thread.join()
         self.treat_breakpoint()
 
     def treat_breakpoint(self):
-        ls = list(set(self.breakpoint))
-        self.breakpoint = ls
-        self.breakpoint.sort()
-        for i in range(len(self.breakpoint)-1):
+        # 去重
+        self.breakpoint = sorted(set(self.breakpoint))
+        i = 0
+        while i < len(self.breakpoint) - 1:
             if self.breakpoint[i+1] - self.breakpoint[i] < self.min_chunk_size:
                 if (self.breakpoint[i+2] - self.breakpoint[i] < self.max_chunk_size and
                         self.breakpoint[i+1] - self.breakpoint[i] >= self.min_chunk_size):
                     self.breakpoint.pop(i+1)
                 else:
-                    self.breakpoint[i+1] = (self.breakpoint[i] + self.breakpoint[i+2])//2
+                    if i + 2 < len(self.breakpoint):
+                        self.breakpoint[i+1] = (self.breakpoint[i] + self.breakpoint[i+2])//2
+                        i += 1
+            else:
+                i += 1
 
 
 class Delicate:
@@ -135,27 +109,23 @@ class Delicate:
         self.hasher = hash_cal
         self.index = {}
 
-    def delicate(self, file_path1, file_path2):
+    def delicate(self, path1, path2):
         indicate = []
         chunking1 = Chunking()
         chunking2 = Chunking()
-        chunking1.init(True)
-        chunking2.init(True)
-        chunking1.start(file_path1)
-        chunking2.start(file_path2)
+        chunking1.start(path1)
+        chunking2.start(path2)
         breakpoint1 = chunking1.back_point()
         breakpoint2 = chunking2.back_point()
-        hasher1 = self.gat_hash(breakpoint1, file_path1)
-        hasher2 = self.gat_hash(breakpoint2, file_path2)
-        j = 0
-        for h2 in hasher2:
-            i = 0
-            for h1 in hasher1:
-                if h1 == h2:
-                    self.index[str(i)+' '+str(breakpoint1[i])] = file_path1
+        hasher1 = self.gat_hash(chunking1.back_point(), path1)
+        hasher2 = self.gat_hash(chunking2.back_point(), path2)
+        for j in range(len(hasher2)):
+            for i in range(len(hasher1)):
+                if hasher1[i] == hasher2[j]:
+                    self.index[breakpoint1[i]] = path1
                     i += 1
                 else:
-                    self.index[str(i)+' '+str(breakpoint2[j])] = file_path2
+                    self.index[breakpoint2[j]] = path2
                     indicate.append(breakpoint2[j])
                     indicate.append(breakpoint2[j+1])
                     break
@@ -168,41 +138,31 @@ class Delicate:
             for i in range(len(breakpoints)-1):
                 f.seek(breakpoints[i])
                 content = f.read(breakpoints[i+1]-breakpoints[i])
-                hash_int = self.hasher(content)
-                hasher.append(hash_int)
+                hasher.append(self.hasher(content))
         return hasher
 
     def remove(self, path, sat_new):
-        i = 0
         with open(path, 'rb') as source_file:
             dir_path = os.path.dirname(path)
             for sat in range(0, len(sat_new), 2):
                 source_file.seek(sat_new[sat])
                 data = source_file.read(sat_new[sat + 1] - sat_new[sat])
-                with open(os.path.join(dir_path, "delicate" + str(i)), 'ab') as target_file:
+                with open(os.path.join(dir_path, "delicate" + str(sat//2)), 'ab') as target_file:
                     target_file.write(data)
         os.remove(path)
 
-    def return_index(self):
+    def store_index(self):
         return self.index
 
 
 def hash_cal(content):
     hash_256 = hashlib.sha256()
     hash_256.update(content)
-    hash_value = hash_256.hexdigest()
-    hash_int = int(hash_value, 16)
-    return hash_int
+    return int(hash_256.hexdigest(), 16)
 
 
-def main():
+if __name__ == '__main__':
     file_path1 = input("请输入文件路径：")
     file_path2 = input("请输入文件路径：")
     delicate = Delicate()
     delicate.delicate(file_path1, file_path2)
-    index = delicate.return_index()
-    print(index)
-
-
-if __name__ == '__main__':
-    main()
