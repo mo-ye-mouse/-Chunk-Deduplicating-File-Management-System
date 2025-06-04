@@ -156,8 +156,9 @@ def main():
         # 去重功能
         elif get[0] == "delicate":
             if len(get) == 3:
-                sat = moye_depublicate.delicate_chunk(get[1], get[2])
-                print(sat)
+                delicate = moye_depublicate.Delicate()
+                delicate.delicate(get[1], get[2])
+                print("Depublicate complete")
         else:
             print("Invalid command")
 
