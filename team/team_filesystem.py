@@ -25,11 +25,41 @@ class FileManager:
         """显示操作菜单"""
         print(f"{self.current_dir}> ")
 
-    def dir(self, *args):
+    def dir(self):
         """dir：列出当前目录下的所有文件和文件夹, 并显示文件大小和修改时间"""
+        # 获取当前工作目录
+        current_dir = os.getcwd()
+        for item in os.listdir(current_dir):
+            item_path = os.path.join(current_dir,item)  # 拼接完整路径
+            size = os.path.getsize(item_path)  # 获取大小
+            modify_time = time.ctime(os.path.getmtime(item_path))
+            if os.path.isfile(item_path):
+                file_type = "文件"
+            else:
+                file_type = "文件夹"
+            print(f"{item:<30}{file_type:<10}{size:>10}字节  {modify_time}")
 
     def cd(self, *args):
         """cd：切换到某目录，可以处理相对路径和绝对路径"""
+        if not args:
+            # 切换到用户主目录
+            os.chdir(os.path.expanduser("~"))
+            print(f"已切换到用户主目录：{os.getcwd()}")
+            return
+
+        # 获取第一个参数作为路径
+        path = args[0]
+        try:
+            os.chdir(path)
+            print(f"已切换到：{os.getcwd()}")
+        except FileNotFoundError:
+            print(f"错误：目录不存在-{path}")
+        except NotADirectoryError:
+            print(f"错误：目录无效-{path}")
+        except PermissionError:
+            print(f"错误：没有权限访问-{path}")
+        except Exception as e:
+            print(f"未知错误：{e}")
 
     def mkdir(self, *args):
         """mkdir：创建文件夹"""
