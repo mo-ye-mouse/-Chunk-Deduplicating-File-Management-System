@@ -17,7 +17,7 @@ class FileManager:
             'copy': self.copy,
             'move': self.move,
             'cls': self.clear,
-            'delicate':self.delicate
+            'delicate': self.delicate
         }
 
     def menu(self):
@@ -50,6 +50,23 @@ class FileManager:
 
     def move(self, *args):
         """处理move命令"""
+        if len(args) < 2:
+            print("错误：使用格式 'move 源文件/文件夹 目标位置'")
+            return
+
+        source_name, destination_name = args[0], args[1]
+        source_path = os.path.join(self.current_dir, source_name)
+        destination_path = os.path.join(self.current_dir, destination_name)
+
+        try:
+            shutil.move(source_path, destination_path)
+            print(f"成功移动 {source_name} 到 {destination_name}")
+        except FileNotFoundError:
+            print("错误：指定的源文件/文件夹不存在。")
+        except PermissionError:
+            print("错误：没有权限移动。")
+        except Exception as e:
+            print(f"错误：{e}")
 
     def clear(self, *args):
         """清屏命令"""
