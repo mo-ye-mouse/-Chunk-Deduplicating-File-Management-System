@@ -16,7 +16,7 @@ class Chunking:
         self.R = r
         self.breakpoint = [0]
         self.hash = rolling_hash
-        self.start(file_path)
+        self.chunking(file_path, os.path.getsize(file_path))
 
     def back_point(self):
         return self.breakpoint
@@ -57,53 +57,6 @@ class Chunking:
                         start += self.min_chunk_size
                     f.seek(start)
             self.breakpoint.append(end - 1)
-
-    def start(self, file_path):
-        # a = time.time()
-        self.chunking(file_path, os.path.getsize(file_path))  # 不使用多线程，如果使用，要去除这行
-    #     # 设置线程参数
-    #     file_size = os.path.getsize(file_path)
-    #     standard_size = 1024*100  # 标准分块大小
-    #     if file_size <= standard_size:
-    #         self.chunking(file_path, file_size)
-    #         return
-    #     num = min(file_size // standard_size, 16)  # 线程数
-    #     chunk_num = file_size // standard_size  # 块数
-    #     if file_size % standard_size != 0:
-    #         chunk_num += 1
-    #     overlap = 100
-    #     # 线程池
-    #     with ThreadPoolExecutor(max_workers=num) as executor:
-    #         futures = []
-    #         for i in range(chunk_num):
-    #             start_pos = i * standard_size
-    #             end_pos = min(start_pos + standard_size + overlap, file_size)
-    #             future = executor.submit(self.chunking, file_path, end_pos, start_pos)
-    #             futures.append(future)
-    #         # 等待所有线程结束
-    #         for future in futures:
-    #             future.result()
-    #     self.treat_breakpoint()
-    #     b = time.time()
-    #     c = b - a
-    #     print(f"分块耗时：{c}s")
-    #     print(f"分块数：{len(self.breakpoint)}")
-    #
-    # def treat_breakpoint(self):
-    #     # 调整断点，去除重复断点
-    #     self.breakpoint = sorted(set(self.breakpoint))
-    #     i = 0
-    #     while i < len(self.breakpoint) - 2:
-    #         if self.breakpoint[i+1] - self.breakpoint[i] < self.min_chunk_size:
-    #             if (self.breakpoint[i+2] - self.breakpoint[i] < self.max_chunk_size and
-    #                     self.breakpoint[i+1] - self.breakpoint[i] >= self.min_chunk_size):
-    #                 self.breakpoint.pop(i+1)
-    #             else:
-    #                 if i + 2 < len(self.breakpoint):
-    #                     self.breakpoint[i+1] = (self.breakpoint[i] + self.breakpoint[i+2])//2
-    #                     i += 1
-    #         else:
-    #             i += 1
 
 
 class Delicate:
@@ -207,3 +160,50 @@ if __name__ == '__main__':
     file_path2 = input("请输入文件路径：")
     delicate = Delicate()
     delicate.delicate(file_path1, file_path2)
+
+    #     断点多线程
+    # def start(self, file_path):
+    #     a = time.time()
+    #     # 设置线程参数
+    #     file_size = os.path.getsize(file_path)
+    #     standard_size = 1024*100  # 标准分块大小
+    #     if file_size <= standard_size:
+    #         self.chunking(file_path, file_size)
+    #         return
+    #     num = min(file_size // standard_size, 16)  # 线程数
+    #     chunk_num = file_size // standard_size  # 块数
+    #     if file_size % standard_size != 0:
+    #         chunk_num += 1
+    #     overlap = 100
+    #     # 线程池
+    #     with ThreadPoolExecutor(max_workers=num) as executor:
+    #         futures = []
+    #         for i in range(chunk_num):
+    #             start_pos = i * standard_size
+    #             end_pos = min(start_pos + standard_size + overlap, file_size)
+    #             future = executor.submit(self.chunking, file_path, end_pos, start_pos)
+    #             futures.append(future)
+    #         # 等待所有线程结束
+    #         for future in futures:
+    #             future.result()
+    #     self.treat_breakpoint()
+    #     b = time.time()
+    #     c = b - a
+    #     print(f"分块耗时：{c}s")
+    #     print(f"分块数：{len(self.breakpoint)}")
+    #
+    # def treat_breakpoint(self):
+    #     # 调整断点，去除重复断点
+    #     self.breakpoint = sorted(set(self.breakpoint))
+    #     i = 0
+    #     while i < len(self.breakpoint) - 2:
+    #         if self.breakpoint[i+1] - self.breakpoint[i] < self.min_chunk_size:
+    #             if (self.breakpoint[i+2] - self.breakpoint[i] < self.max_chunk_size and
+    #                     self.breakpoint[i+1] - self.breakpoint[i] >= self.min_chunk_size):
+    #                 self.breakpoint.pop(i+1)
+    #             else:
+    #                 if i + 2 < len(self.breakpoint):
+    #                     self.breakpoint[i+1] = (self.breakpoint[i] + self.breakpoint[i+2])//2
+    #                     i += 1
+    #         else:
+    #             i += 1
