@@ -1,6 +1,6 @@
 import os
 import shutil
-import moye_depublicate
+from moye import moye_depublicate
 
 
 class FileSystem:
