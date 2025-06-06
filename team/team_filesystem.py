@@ -24,7 +24,7 @@ class FileManager:
         """显示操作菜单"""
         print(f"{self.current_dir}> ")
 
-    def dir(self):
+    def dir(self, *args):
         """dir：列出当前目录下的所有文件和文件夹, 并显示文件大小和修改时间"""
         # 获取当前工作目录
         current_dir = os.getcwd()
@@ -62,9 +62,34 @@ class FileManager:
 
     def mkdir(self, *args):
         """mkdir：创建文件夹"""
+        if not args:
+            print("mkdir: missing argument")
+            return
+        folder_name = args[0]
+        try:
+            # 使用os.makedirs创建文件夹，exist_ok=True表示如果文件存在则不报错
+            os.makedirs(folder_name, exist_ok=True)
+            print(f"Directory '{folder_name}' created successfully")
+        except Exception as e:
+            print(f"mkdir: error creating direction: {e}")
 
     def type(self, *args):
         """处理type文件名命令"""
+        if not args:
+            print("type: missing argument")
+            return
+        file_name = args[0]
+        try:
+            # 检查文件是否存在
+            if not os.path.isfile(file_name):
+                print(f"type: file'{file_name} not found")
+                return
+            # 读取文件内容并打印
+            with open(file_name, 'r') as file:
+                content = file.read()
+                print(content)
+        except Exception as e:
+            print(f"type: error reading file: {e}")
 
     def rename(self, *args):
         """处理rename命令"""
