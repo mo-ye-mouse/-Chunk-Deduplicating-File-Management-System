@@ -1,7 +1,6 @@
 import os
 import shutil
 import time
-from os import remove
 
 
 class FileManager:
@@ -30,7 +29,7 @@ class FileManager:
         # 获取当前工作目录
         current_dir = os.getcwd()
         for item in os.listdir(current_dir):
-            item_path = os.path.join(current_dir,item)  # 拼接完整路径
+            item_path = os.path.join(current_dir, item)  # 拼接完整路径
             size = os.path.getsize(item_path)  # 获取大小
             modify_time = time.ctime(os.path.getmtime(item_path))
             if os.path.isfile(item_path):
@@ -72,14 +71,14 @@ class FileManager:
         if len(args) != 2:
             print("格式错误，用法: rename 旧名 新名")
             return
-        old_name,new_name=args
-        old_path=os.path.join(self.current_dir,old_name)
-        new_path=os.path.join(self.current_dir,new_name)
+        old_name, new_name = args
+        old_path = os.path.join(self.current_dir, old_name)
+        new_path = os.path.join(self.current_dir, new_name)
         if not os.path.exists(old_path):
             print(f"错误：{old_name}不存在")
             return
         try:
-            os.rename(old_path,new_path)
+            os.rename(old_path, new_path)
             print("重命名成功")
         except Exception as e:
             print(f"重命名失败：{e}")
@@ -89,8 +88,8 @@ class FileManager:
         if len(args) != 1:
             print("格式错误，用法：del 单个文件的文件名")
             return
-        file_name=args[0]
-        file_path=os.path.join(self.current_dir,file_name)
+        file_name = args[0]
+        file_path = os.path.join(self.current_dir, file_name)
         if not os.path.isfile(file_path):
             print(f"错误：{file_path}不是单个文件或不存在")
             return
@@ -121,8 +120,7 @@ class FileManager:
             if os.path.isdir(src):
                 shutil.copytree(src, dst, dirs_exist_ok=True)
             else:
-                shutil.copy2(src, dst if not os.path.isdir(dst)
-                else os.path.join(dst, os.path.basename(src)))
+                shutil.copy2(src, dst if not os.path.isdir(dst) else os.path.join(dst, os.path.basename(src)))
             print(f"复制完成: {args[0]} → {args[1]}")
         except Exception as e:
             print(f"复制失败: {str(e)}")
@@ -147,7 +145,7 @@ class FileManager:
         except Exception as e:
             print(f"错误：{e}")
 
-    def clear(self, *args):
+    def clear(self):
         """清屏命令"""
         os.system('cls' if os.name == 'nt' else 'clear')
 
