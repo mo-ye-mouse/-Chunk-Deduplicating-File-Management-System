@@ -1,5 +1,8 @@
 import os
 import shutil
+import socket
+import time
+from concurrent.futures import ThreadPoolExecutor
 from moye import moye_depublicate
 
 
@@ -7,6 +10,13 @@ class FileSystem:
     def __init__(self):
         self.root = os.path.abspath(os.sep)
         self.current = self.root
+        self.menu = {
+            "dir": self.ls,
+            "cd": self.cd,
+            "mkdir": self.mkdir,
+            "rm": self.rm,
+            "delicate": self.delicate
+        }
         os.chdir(self.current)
 
     def handel_path(self, path, adjust=True):
@@ -43,38 +53,40 @@ class FileSystem:
 
     def ls(self, commend=""):
         if commend not in ["/a:d", "/a:-d", ""]:
-            print("Invalid option")
-            return
+            return "Invalid option"
         os.chdir(self.current)
         item = os.listdir()
+        back = []
         for i in item:
             if commend == "/a:d" and os.path.isfile(i):
-                print(f"{i}")
+                back.append(i)
             elif commend == "/a:-d" and os.path.isdir(i):
-                print(f"{i}")
+                back.append(i)
             else:
-                print(f"{i}")
+                back.append(i)
+        return back
 
     def cd(self, path):
         if path[0] not in [".", "\\", self.root[0]]:
-            print("Invalid option")
-            return
+            return "Invalid option"
         get = self.handel_path(path, False)
+        if not get:
+            return "Invalid option"
+        return "Directory changed to " + str(get)
 
     def mkdir(self, path):
         old_path = os.getcwd()
         if path[0] not in [".", "\\", self.root[0]]:
-            print("Invalid option")
-            return
+            return "Invalid option"
         get = self.handel_path(path)
         if not get:
-            return
+            return "Invalid option"
+        os.chdir(old_path)
         try:
             os.mkdir(get)
-            print(f"Directory {get} created")
+            return "Directory " + str(get) + " created"
         except FileExistsError:
-            print("File or directory already exists")
-        os.chdir(old_path)
+            return "File or directory already exists"
 
     def rm(self, path):
         old_path = os.getcwd()
@@ -82,85 +94,72 @@ class FileSystem:
         if path[0] not in [".", "\\", self.root[0]]:
             if len(parts) == 3:
                 if not parts[0] == "/s" or not parts[1] == "/q" or not parts[2][0] in [".", "\\", self.root[0]]:
-                    print("Invalid option")
-                    return
+                    return "Invalid option"
                 else:
                     get = self.handel_path(parts[2], False)
                     if not get:
-                        return
+                        return "Invalid option"
                     else:
                         shutil.rmtree(self.current)
                         print(f"Directory {get} deleted")
                         os.chdir(self.root)
                         self.current = os.getcwd()
-                        return
+                        return "Directory " + str(get) + " deleted"
             else:
-                print("Invalid option")
+                return "Invalid option"
         elif len(parts) == 1 and path[0] in [".", "\\", self.root[0]]:
             get = self.handel_path(path)
             if not get:
-                return
+                return "Invalid option"
             try:
                 os.remove(self.current + "\\" + get)
+                return "Directory " + str(get) + " deleted"
             except FileNotFoundError:
-                print("No such file or directory")
                 os.chdir(old_path)
                 self.current = os.getcwd()
+                return "No such file or directory"
 
-    def do_EOF(self, arg):
-        return True
+    def delicate(self, path1, path2):
+        delicate = moye_depublicate.Delicate()
+        delicate.delicate(path1, path2)
+
+    def tackle(self, message):
+        if message[0] in self.menu:
+            info = self.menu[message[0]](message[1:])
+        else:
+            info = "Invalid command"
+        return info
+
+
+def handle_conn(addr, conn, fs):
+    while True:
+        try:
+            get = conn.recv(1024).decode("utf-8")
+            print(f"{addr}: {get}")
+            get = get.strip().split(" ")
+            if get[0] == "exit":
+                break
+            info = fs.tackle(get)
+            conn.send(info.encode("utf-8"))
+        except ConnectionResetError:
+            break
+    conn.close()
+    print(f"{addr} disconnected")
 
 
 def main():
     fs = FileSystem()
-    while True:
-        # 对于输入的命令进行处理
-        try:
-            get = input(f"{fs.current}$ ").strip().split(" ")
-        except EOFError:
-            fs.do_EOF(None)
-            break
-        # 功能实现
-        if get[0] == "exit":
-            break
-        if get[0] == "dir":
-            if len(get) > 1:
-                fs.ls(get[1])
-            else:
-                fs.ls()
-            continue
-        elif get[0] == "cd":
-            if len(get) == 1:
-                print("No directory specified")
-                continue
-            else:
-                fs.cd(get[1])
-                continue
-        elif get[0] == "mkdir":
-            if len(get) == 1:
-                print("No directory specified")
-                continue
-            else:
-                fs.mkdir(get[1])
-                continue
-        elif get[0] == "rm":
-            if len(get) == 2:
-                fs.rm(get[1])
-                continue
-            elif len(get) == 4:
-                fs.rm(get[1]+" "+get[2]+" "+get[3])
-                continue
-            else:
-                print("Invalid option")
-                continue
-        # 去重功能
-        elif get[0] == "delicate":
-            if len(get) == 3:
-                delicate = moye_depublicate.Delicate()
-                delicate.delicate(get[1], get[2])
-                print("Depublicate complete")
-        else:
-            print("Invalid command")
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.bind(('127.0.0.1', 8080))
+    s.listen(5)
+    print("Waiting for connection...")
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        features = []
+        while True:
+            conn, addr = s.accept()
+            print(f"Connected by {addr}")
+            feature = executor.submit(handle_conn, addr, conn, fs)
+            features.append(feature)
 
 
 if __name__ == "__main__":
