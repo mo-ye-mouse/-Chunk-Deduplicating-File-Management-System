@@ -72,9 +72,30 @@ class FileManager:
 
     def delete_directory(self, *args):
         """处理rmdir/rd命令"""
+        if not args:
+            return print("用法: rmdir 目录名")
+        try:
+            path = os.path.join(self.current_dir, args[0])
+            os.rmdir(path)
+            print(f"已删除目录: {args[0]}")
+        except Exception as e:
+            print(f"错误:{e}")
 
     def copy(self, *args):
         """处理copy命令"""
+        if len(args) < 2:
+            return print("用法: copy 源路径 目标路径")
+        try:
+            src = os.path.join(self.current_dir, args[0])
+            dst = os.path.join(self.current_dir, args[1])
+            if os.path.isdir(src):
+                shutil.copytree(src, dst, dirs_exist_ok=True)
+            else:
+                shutil.copy2(src, dst if not os.path.isdir(dst)
+                else os.path.join(dst, os.path.basename(src)))
+            print(f"复制完成: {args[0]} → {args[1]}")
+        except Exception as e:
+            print(f"复制失败: {str(e)}")
 
     def move(self, *args):
         """处理move命令"""
