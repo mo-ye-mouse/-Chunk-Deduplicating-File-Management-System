@@ -1,6 +1,7 @@
 import os
 import shutil
 import time
+from os import remove
 
 
 class FileManager:
@@ -38,15 +39,63 @@ class FileManager:
 
     def rename(self, *args):
         """处理rename命令"""
+        if len(args) != 2:
+            print("格式错误，用法: rename 旧名 新名")
+            return
+        old_name,new_name=args
+        old_path=os.path.join(self.current_dir,old_name)
+        new_path=os.path.join(self.current_dir,new_name)
+        if not os.path.exists(old_path):
+            print(f"错误：{old_name}不存在")
+            return
+        try:
+            os.rename(old_path,new_path)
+            print("重命名成功")
+        except Exception as e:
+            print(f"重命名失败：{e}")
 
     def delete_item(self, *args):
         """处理del/rm命令"""
+        if len(args) != 1:
+            print("格式错误，用法：del 单个文件的文件名")
+            return
+        file_name=args[0]
+        file_path=os.path.join(self.current_dir,file_name)
+        if not os.path.isfile(file_path):
+            print(f"错误：{file_path}不是单个文件或不存在")
+            return
+        try:
+            os.remove(file_path)
+            print("成功删除该文件")
+        except Exception as e:
+            print(f"删除文件失败：{e}")
 
     def delete_directory(self, *args):
         """处理rmdir/rd命令"""
+        if not args:
+            return print("用法: rmdir 目录名")
+        try:
+            path = os.path.join(self.current_dir, args[0])
+            os.rmdir(path)
+            print(f"已删除目录: {args[0]}")
+        except Exception as e:
+            print(f"错误:{e}")
 
     def copy(self, *args):
         """处理copy命令"""
+        if len(args) < 2:
+            return print("用法: copy 源路径 目标路径")
+        try:
+            src = os.path.join(self.current_dir, args[0])
+            dst = os.path.join(self.current_dir, args[1])
+            if os.path.isdir(src):
+                shutil.copytree(src, dst, dirs_exist_ok=True)
+            else:
+                shutil.copy2(src, dst if not os.path.isdir(dst)
+                else os.path.join(dst, os.path.basename(src)))
+            print(f"复制完成: {args[0]} → {args[1]}")
+        except Exception as e:
+            print(f"复制失败: {str(e)}")
 
     def move(self, *args):
         """处理move命令"""
