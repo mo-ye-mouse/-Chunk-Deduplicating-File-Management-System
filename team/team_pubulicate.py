@@ -90,7 +90,7 @@ def delicate():
     pass
 
 def rolling_hash(content):
-    window_size = 3  # 固定窗口大小
+    window_size = 48  # 固定窗口大小
     position = 0  # 固定起始位置
     base = 256  # 字符集大小
     prime = 101  # 用于取模的素数
