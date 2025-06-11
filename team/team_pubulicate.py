@@ -29,8 +29,37 @@ class TTTDS:
         return self.breakpoint
 
     def chunking(self, file_path, end, start=0):
-        # 分块
-        pass
+        self.breakpoint = [start]
+        try:
+            with open(file_path, 'rb') as f:
+                f.seek(start)
+                window_buffer = f.read(self.window)
+                position = start + len(window_buffer)
+                while position < end:
+                    # 内联SHA-256哈希计算
+                    hash_val = int(hashlib.sha256(window_buffer).hexdigest(), 16)
+                    # TTTD断点检测条件
+                    if (hash_val % self.D == self.R) or \
+                            (hash_val % self.Ddash == self.R and len(window_buffer) >= self.Tmin):
+                        self.breakpoint.append(position)
+                        window_buffer = bytes()
+                    # 滑动窗口
+                    next_byte = f.read(1)
+                    if not next_byte:
+                        break
+                    window_buffer = window_buffer[1:] + next_byte
+                    position += 1
+                    # 强制分块条件
+                    if len(window_buffer) > self.Tmax:
+                        self.breakpoint.append(position - len(window_buffer))
+                        window_buffer = bytes()
+                # 添加最终断点
+                if position not in self.breakpoint:
+                    self.breakpoint.append(position)
+            return self.breakpoint
+        except Exception as e:
+            print(f"分块错误: {str(e)}")
+            return None
 
 
 def delicate():
