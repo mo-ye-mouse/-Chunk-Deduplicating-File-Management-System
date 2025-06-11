@@ -150,16 +150,16 @@ def rolling_hash(content):
     for _ in range(window_size - 1):
         h = (h * base) % prime
     hash_value = 0
-    for byte in content[position:position + window_size]:
+    for byte in content[:position + window_size]:
         hash_value = (base * hash_value + byte) % prime
     return hash_value
 
-
-if __name__ == '__main__':
-    file_path1 = input("请输入文件路径：")
-    file_path2 = input("请输入文件路径：")
-    delicate = Delicate()
-    delicate.delicate(file_path1, file_path2)
+#
+# if __name__ == '__main__':
+#     file_path1 = input("请输入文件路径：")
+#     file_path2 = input("请输入文件路径：")
+#     delicate = Delicate()
+#     delicate.delicate(file_path1, file_path2)
 
     #     断点多线程
     # def start(self, file_path):

@@ -1,6 +1,7 @@
 import os
 import shutil
 import time
+import team_pubulicate
 
 
 class FileManager:
@@ -17,19 +18,33 @@ class FileManager:
             'copy': self.copy,
             'move': self.move,
             'cls': self.clear,
+            'help': self.help,
             'delicate': self.delicate
         }
 
-    def menu(self):
-        """显示操作菜单"""
-        print(f"{self.current_dir}> ")
+    @staticmethod
+    def help():
+        print("directory commands:")
+        print("*dir [directory] *cd [directory] *mkdir [directory] *type [file] *rename [old_name] [new_name]")
+        print("*del [file] *rmdir [directory] *copy [src] [dst] *move [src] [dst] *cls *delicate: 此命令尚未实现")
 
-    def dir(self, *args):
-        """dir：列出当前目录下的所有文件和文件夹, 并显示文件大小和修改时间"""
+    def dir(self, *args):  # yes
+        """dir：列出目录下的所有文件和文件夹, 并显示文件大小和修改时间"""
         # 获取当前工作目录
-        current_dir = os.getcwd()
-        for item in os.listdir(current_dir):
-            item_path = os.path.join(current_dir, item)  # 拼接完整路径
+        if len(args) > 1:
+            print("Error: usage: dir [directory]")
+            return
+        try:
+            os.chdir(args[0] if args else self.current_dir)
+        except Exception as e:
+            print(f"Error: {e}")
+            return
+        dirs = os.getcwd()
+        if not os.path.isdir(dirs):
+            print(f"Error: {dirs} is not a directory")
+            return
+        for item in os.listdir(dirs):
+            item_path = os.path.join(dirs, item)  # 拼接完整路径
             size = os.path.getsize(item_path)  # 获取大小
             modify_time = time.ctime(os.path.getmtime(item_path))
             if os.path.isfile(item_path):
@@ -37,61 +52,28 @@ class FileManager:
             else:
                 file_type = "文件夹"
             print(f"{item:<30}{file_type:<10}{size:>10}字节  {modify_time}")
+        os.chdir(self.current_dir)
 
-    def cd(self, *args):
-        """cd：切换到某目录，可以处理相对路径和绝对路径"""
+    def cd(self, *args):  # yes
+        """cd：切换到某目录，可以处理相对路径和绝对路径，但是没有过于严格"""
+        if len(args) > 1:
+            print("Error: usage: cd [directory]")
+            return
         if not args:
             # 切换到用户主目录
             os.chdir(os.path.expanduser("~"))
-            print(f"已切换到用户主目录：{os.getcwd()}")
+            self.current_dir = os.getcwd()
             return
 
         # 获取第一个参数作为路径
         path = args[0]
         try:
             os.chdir(path)
-            print(f"已切换到：{os.getcwd()}")
-        except FileNotFoundError:
-            print(f"错误：目录不存在-{path}")
-        except NotADirectoryError:
-            print(f"错误：目录无效-{path}")
-        except PermissionError:
-            print(f"错误：没有权限访问-{path}")
-        except Exception as e:
-            print(f"未知错误：{e}")
+            self.current_dir = os.getcwd()
+        except Exception as e:  # 处理所有异常
+            print(f"Error：{e}")
 
-    def mkdir(self, *args):
-        """mkdir：创建文件夹"""
-        if not args:
-            print("mkdir: missing argument")
-            return
-        folder_name = args[0]
-        try:
-            # 使用os.makedirs创建文件夹，exist_ok=True表示如果文件存在则不报错
-            os.makedirs(folder_name, exist_ok=True)
-            print(f"Directory '{folder_name}' created successfully")
-        except Exception as e:
-            print(f"mkdir: error creating direction: {e}")
-
-    def type(self, *args):
-        """处理type文件名命令"""
-        if not args:
-            print("type: missing argument")
-            return
-        file_name = args[0]
-        try:
-            # 检查文件是否存在
-            if not os.path.isfile(file_name):
-                print(f"type: file'{file_name} not found")
-                return
-            # 读取文件内容并打印
-            with open(file_name, 'r') as file:
-                content = file.read()
-                print(content)
-        except Exception as e:
-            print(f"type: error reading file: {e}")
-
-    def rename(self, *args):
+    def rename(self, *args):  # yes
         """处理rename命令"""
         if len(args) != 2:
             print("格式错误，用法: rename 旧名 新名")
@@ -108,7 +90,7 @@ class FileManager:
         except Exception as e:
             print(f"重命名失败：{e}")
 
-    def delete_item(self, *args):
+    def delete_item(self, *args):  # yes
         """处理del/rm命令"""
         if len(args) != 1:
             print("格式错误，用法：del 单个文件的文件名")
@@ -135,7 +117,7 @@ class FileManager:
         except Exception as e:
             print(f"错误:{e}")
 
-    def copy(self, *args):
+    def copy(self, *args):  # yes
         """处理copy命令"""
         if len(args) < 2:
             return print("用法: copy 源路径 目标路径")
@@ -153,7 +135,7 @@ class FileManager:
     def move(self, *args):
         """处理move命令"""
         if len(args) < 2:
-            print("错误：使用格式 'move 源文件/文件夹 目标位置'")
+            print("error: usage：move 源文件/文件夹 目标位置")
             return
 
         source_name, destination_name = args[0], args[1]
@@ -162,20 +144,62 @@ class FileManager:
 
         try:
             shutil.move(source_path, destination_path)
-            print(f"成功移动 {source_name} 到 {destination_name}")
-        except FileNotFoundError:
-            print("错误：指定的源文件/文件夹不存在。")
-        except PermissionError:
-            print("错误：没有权限移动。")
+            print(f"success: move {source_name} to {destination_name}")
         except Exception as e:
-            print(f"错误：{e}")
+            print(f"error：{e}")
 
-    def clear(self):
+    @staticmethod
+    def mkdir(*args):  # yes
+        """mkdir：创建文件夹"""
+        if len(args) != 1:
+            print("error: usage: mkdir [directory]")
+            return
+        folder_name = args[0]
+        try:
+            # 使用os.makedirs创建文件夹，exist_ok=True表示如果文件存在则不报错
+            os.makedirs(folder_name, exist_ok=True)
+            print(f"Directory '{folder_name}' created successfully")
+        except Exception as e:
+            print(f"mkdir: error creating direction: {e}")
+
+    @staticmethod
+    def type(*args):  # 处理不了部分txt，比如日文
+        """处理type文件名命令"""
+        if not args:
+            print("type: missing argument")
+            return
+        file_name = args[0]
+        try:
+            # 检查文件是否存在
+            if not os.path.isfile(file_name):
+                print(f"type: file'{file_name} not found")
+                return
+            # 读取文件内容并打印
+            with open(file_name, 'r') as file:
+                content = file.read()
+                print(content)
+        except Exception as e:
+            print(f"type: error reading file: {e}")
+
+    @staticmethod
+    def clear():
         """清屏命令"""
         os.system('cls' if os.name == 'nt' else 'clear')
 
     def delicate(self, *args):
         """处理delicate命令"""
+        if len(args) != 2:
+            print("error: usage: delicate 源文件 目标文件")
+            return
+        source_name, destination_name = args[0], args[1]
+        try:
+            source_path = os.path.join(self.current_dir, source_name)
+            destination_path = os.path.join(self.current_dir, destination_name)
+        except Exception as e:
+            print(f"error: {e}")
+            return
+        team_pubulicate.delicate(source_path, destination_path)
+        print(f"success: delicate {source_name} to {destination_name}")
 
     def parse_command(self, command):
         """解析用户输入的命令"""
@@ -188,12 +212,13 @@ class FileManager:
 
         if cmd in self.supported_commands:
             self.supported_commands[cmd](*args)
+        else:
+            print(f"Error: command '{cmd}' not found")
         return True
 
     def run(self):
         """运行文件管理系统"""
         while True:
-            self.menu()
             command = input(f"\n{self.current_dir}> ")
             if not self.parse_command(command):
                 break

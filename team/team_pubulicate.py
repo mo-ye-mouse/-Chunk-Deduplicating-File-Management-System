@@ -85,7 +85,7 @@ class TTTDS:
             return None
 
 
-def delicate():
+def delicate(path1, path2):
     # 去重
     pass
 
