@@ -1,7 +1,6 @@
 import os
 import shutil
 import time
-from os import remove
 
 
 class FileManager:
@@ -27,29 +26,84 @@ class FileManager:
 
     def dir(self, *args):
         """dir：列出当前目录下的所有文件和文件夹, 并显示文件大小和修改时间"""
+        # 获取当前工作目录
+        current_dir = os.getcwd()
+        for item in os.listdir(current_dir):
+            item_path = os.path.join(current_dir, item)  # 拼接完整路径
+            size = os.path.getsize(item_path)  # 获取大小
+            modify_time = time.ctime(os.path.getmtime(item_path))
+            if os.path.isfile(item_path):
+                file_type = "文件"
+            else:
+                file_type = "文件夹"
+            print(f"{item:<30}{file_type:<10}{size:>10}字节  {modify_time}")
 
     def cd(self, *args):
         """cd：切换到某目录，可以处理相对路径和绝对路径"""
+        if not args:
+            # 切换到用户主目录
+            os.chdir(os.path.expanduser("~"))
+            print(f"已切换到用户主目录：{os.getcwd()}")
+            return
+
+        # 获取第一个参数作为路径
+        path = args[0]
+        try:
+            os.chdir(path)
+            print(f"已切换到：{os.getcwd()}")
+        except FileNotFoundError:
+            print(f"错误：目录不存在-{path}")
+        except NotADirectoryError:
+            print(f"错误：目录无效-{path}")
+        except PermissionError:
+            print(f"错误：没有权限访问-{path}")
+        except Exception as e:
+            print(f"未知错误：{e}")
 
     def mkdir(self, *args):
         """mkdir：创建文件夹"""
+        if not args:
+            print("mkdir: missing argument")
+            return
+        folder_name = args[0]
+        try:
+            # 使用os.makedirs创建文件夹，exist_ok=True表示如果文件存在则不报错
+            os.makedirs(folder_name, exist_ok=True)
+            print(f"Directory '{folder_name}' created successfully")
+        except Exception as e:
+            print(f"mkdir: error creating direction: {e}")
 
     def type(self, *args):
         """处理type文件名命令"""
+        if not args:
+            print("type: missing argument")
+            return
+        file_name = args[0]
+        try:
+            # 检查文件是否存在
+            if not os.path.isfile(file_name):
+                print(f"type: file'{file_name} not found")
+                return
+            # 读取文件内容并打印
+            with open(file_name, 'r') as file:
+                content = file.read()
+                print(content)
+        except Exception as e:
+            print(f"type: error reading file: {e}")
 
     def rename(self, *args):
         """处理rename命令"""
         if len(args) != 2:
             print("格式错误，用法: rename 旧名 新名")
             return
-        old_name,new_name=args
-        old_path=os.path.join(self.current_dir,old_name)
-        new_path=os.path.join(self.current_dir,new_name)
+        old_name, new_name = args
+        old_path = os.path.join(self.current_dir, old_name)
+        new_path = os.path.join(self.current_dir, new_name)
         if not os.path.exists(old_path):
             print(f"错误：{old_name}不存在")
             return
         try:
-            os.rename(old_path,new_path)
+            os.rename(old_path, new_path)
             print("重命名成功")
         except Exception as e:
             print(f"重命名失败：{e}")
@@ -59,8 +113,8 @@ class FileManager:
         if len(args) != 1:
             print("格式错误，用法：del 单个文件的文件名")
             return
-        file_name=args[0]
-        file_path=os.path.join(self.current_dir,file_name)
+        file_name = args[0]
+        file_path = os.path.join(self.current_dir, file_name)
         if not os.path.isfile(file_path):
             print(f"错误：{file_path}不是单个文件或不存在")
             return
@@ -91,8 +145,7 @@ class FileManager:
             if os.path.isdir(src):
                 shutil.copytree(src, dst, dirs_exist_ok=True)
             else:
-                shutil.copy2(src, dst if not os.path.isdir(dst)
-                else os.path.join(dst, os.path.basename(src)))
+                shutil.copy2(src, dst if not os.path.isdir(dst) else os.path.join(dst, os.path.basename(src)))
             print(f"复制完成: {args[0]} → {args[1]}")
         except Exception as e:
             print(f"复制失败: {str(e)}")
@@ -117,7 +170,7 @@ class FileManager:
         except Exception as e:
             print(f"错误：{e}")
 
-    def clear(self, *args):
+    def clear(self):
         """清屏命令"""
         os.system('cls' if os.name == 'nt' else 'clear')
 
