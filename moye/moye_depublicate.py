@@ -23,13 +23,14 @@ class Chunking:
 
     def chunking(self, file_path, end, start=0):
         with open(file_path, 'rb') as f:
-            start += self.min_chunk_size - self.window_size
-            f.seek(start)
+            start += self.min_chunk_size
+            f.seek(start - self.window_size)
             new_chunk = True  # 新块判断
             change_d = False  # 除数切换判断
             while end - start > self.min_chunk_size:
                 # 进入块判断
                 if new_chunk:
+                    f.read(self.min_chunk_size-self.window_size)
                     content = f.read(self.window_size)
                     new_chunk = False
                 else:
@@ -38,24 +39,23 @@ class Chunking:
                 hash_int = self.hash(content)
                 current_d = self.minor_d if change_d else self.main_d
                 # 判断断点
-                if hash_int % current_d == self.R:
+                if hash_int % current_d == self.R and start - self.breakpoint[-1] >= self.min_chunk_size:
                     self.breakpoint.append(start + self.window_size - 1)
-                    start += self.min_chunk_size
+                    start = f.tell() + self.min_chunk_size
                     new_chunk = True
                 else:
                     start += self.footer_size
-                f.seek(start)
                 # 如果到达最大块尺寸，则切换除数并重新设置断点
                 if start - self.breakpoint[-1] >= self.max_chunk_size:
                     change_d = not change_d
                     new_chunk = True
                     # 如果都无法设置断点，那么将最大块作为断点
                     if change_d:
-                        start = self.breakpoint[-1] + 1 - self.window_size + self.min_chunk_size
+                        start = self.breakpoint[-1]
+                        f.seek(start)
                     else:
-                        self.breakpoint.append(start + self.window_size - 1)
-                        start += self.min_chunk_size
-                    f.seek(start)
+                        self.breakpoint.append(f.tell() - 1)
+                        start = f.tell()
             self.breakpoint.append(end - 1)
 
 
