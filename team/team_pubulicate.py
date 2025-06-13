@@ -5,13 +5,12 @@ from sys import orig_argv
 
 class TTTDS:
     def __init__(self):
-        self.file_path = ""
+        self.file_path = " "
         self.window = 48  # 滑动窗口大小
         self.Tmax = 2800  # 最大阈值
         self.Tmin = 460  # 最小阈值
         self.D = 540  # 主除数
-        self.Ddash = 270  # 次除数
-        self.R = -1 # 余数
+        self.second_D = 270  # 次除数
         self.breakpoint = [0]
         self.backupBreak = 0
         self.switchP = 1600 # 切换参数
@@ -22,64 +21,52 @@ class TTTDS:
     def back_point(self):
         return self.breakpoint
 
-    def chunking(self, file_path, end, start=0):
+    def reset_divisor(self):
+        # 恢复主除数和次除数的原始值
+        self.D = 540
+        self.second_D = 270
+
+    def chunking(self, file_path):
+        file_size = os.path.getsize(file_path)
+        buffer = bytearray(self.window)
+        lastP = 0
+        currP = 0
         try:
             with open(file_path, 'rb') as f:
-                f.seek(start)
-                window_buffer = f.read(self.window)
-                if not window_buffer:
-                    return self.breakpoint
-                # 初始化滚动哈希
-                hash_value = rolling_hash(window_buffer)
-                position = start + len(window_buffer)
-                lastP = start
-                currP = start + len(window_buffer)
-                original_D = self.D
-                original_Ddash = self.Ddash
-                while position < end:
-                    # TTTDS断点检测条件
-                    if hash_value % self.D == self.R:
-                        self.breakpoint.append(position)
-                        lastP = position
-                        currP = position
-                        self.backupBreak = 0
-                        self.D = original_D
-                        self.Ddash = original_Ddash
-                    elif hash_value % self.Ddash == self.R:
-                        self.backupBreak = position
-                    # 滑动窗口
-                    next_byte = f.read(1)
-                    if not next_byte:
+                f.seek(lastP)
+                f.readinto(buffer)
+                while currP < file_size:
+                    byte = f.read(1)
+                    if not byte:
                         break
-                    # 更新滚动哈希值
-                    window_buffer = window_buffer[1:] + next_byte
-                    hash_value = rolling_hash(window_buffer)
-                    currP += 1
-                    position += 1
-                    # 切换主除数和次除数
-                    if (currP - lastP) > self.switchP:
-                        temp_Ddash = self.Ddash
-                        self.D = self.Ddash
-                        self.Ddash = temp_Ddash // 2
-                    # 强制分块条件
-                    if (currP - lastP) >= self.Tmax:
-                        if self.backupBreak != 0:
+                    buffer = buffer[1:] + byte
+                    currP += 1   # 更新当前位置
+                    if currP - lastP < self.Tmin:
+                        continue
+                    # 判断是否超过switchP,切换主除数和次除数
+                    if currP - lastP > self.switchP:
+                        self.D, self.second_D = self.second_D // 2, self.D
+                    # 计算初始窗口的哈希值
+                    hash_value = rolling_hash(buffer)
+                    # 判断是否满足主次除数的条件，记录备份断点和确定块边界
+                    if hash_value % self.second_D == self.second_D - 1:
+                        self.backupBreak = currP
+                    if hash_value % self.D == self.D - 1:
+                        self.breakpoint.append(currP)
+                        self.backupBreak = 0
+                        self.lastP = currP
+                        self.reset_divisor()
+                        continue
+                    # 判断是否达到最大阈值，如果有备份断点，使用备份断点作为块边界；否则，使用当前位置作为块边界
+                    if currP - lastP >= self.Tmax:
+                        if self.backupBreak:
                             self.breakpoint.append(self.backupBreak)
                             lastP = self.backupBreak
                         else:
-                            self.breakpoint.append(position - len(window_buffer))
-                            lastP = position - len(window_buffer)
+                            self.breakpoint.append(currP)
+                            lastP = currP
                         self.backupBreak = 0
-                        # 恢复原始的主除数和次除数
-                        self.D = original_D
-                        self.Ddash = original_Ddash
-                        # 检查最小阈值
-                    if (currP - lastP) < self.Tmin:
-                        continue
-                # 添加最终断点
-                if position not in self.breakpoint:
-                    self.breakpoint.append(position)
-            return self.breakpoint
+                        self.reset_divisor()
         except Exception as e:
             print(f"分块错误: {str(e)}")
             return None
