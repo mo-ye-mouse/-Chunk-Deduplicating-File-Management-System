@@ -25,13 +25,14 @@ class TTTDS:
 
     def chunking(self, file_path):
         file_size = os.path.getsize(file_path)
-        buffer = bytearray(self.window)
+        buffer = bytearray(self.window)     # 读取初始窗口数据
         lastP = 0
         currP = 0
         try:
             with open(file_path, 'rb') as f:
-                f.seek(lastP)
-                f.readinto(buffer)
+                f.seek(lastP)          # 移动指针到上一个块的结束位置
+                f.readinto(buffer)     # 读取初始窗口数据
+                currP = self.window    # 当前位置设置为窗口大小
                 while currP < file_size:
                     byte = f.read(1)
                     if not byte:
