@@ -8,101 +8,76 @@ import mysql.connector
 
 
 class TTTDS:
-    def __init__(self):
-        self.file_path = " "
-        self.window = 48  # 滑动窗口大小
-        self.Tmax = 2800  # 最大阈值
-        self.Tmin = 460  # 最小阈值
-        self.D = 540  # 主除数
-        self.second_D = 270  # 次除数
+    def __init__(self, file_path, window_size=256, max_chunk_size=8196, min_chunk_size=512, main_d=16, minor_d=8, r=0):
+        self.window_size = window_size
+        self.max_chunk_size = max_chunk_size
+        self.min_chunk_size = min_chunk_size
+        self.footer_size = 1
+        self.main_d = main_d
+        self.minor_d = minor_d
+        self.R = r
         self.breakpoint = [0]
-        self.backupBreak = 0
-        self.switchP = 1600 # 切换参数
+        self.hash = rolling_hash
+        self.chunking(file_path, os.path.getsize(file_path))
 
     def back_point(self):
         return self.breakpoint
 
-    def init(self, file_path):
-        self.file_path = file_path
-
-    def reset_divisor(self):
-        # 恢复主除数和次除数的原始值
-        self.D = 540
-        self.second_D = 270
-
-    def chunking(self, file_path):
-        file_size = os.path.getsize(file_path)
-        buffer = bytearray(self.window)     # 读取初始窗口数据
-        lastP = 0
-        currP = 0
-        try:
-            with open(file_path, 'rb') as f:
-                f.seek(lastP)          # 移动指针到上一个块的结束位置
-                f.readinto(buffer)     # 读取初始窗口数据
-                currP = self.window    # 当前位置设置为窗口大小
-                while currP < file_size:
-                    byte = f.read(1)
-                    if not byte:
-                        break
-                    buffer = buffer[1:] + byte
-                    currP += 1   # 更新当前位置
-                    # 判断是否达到最小阈值，没有则currP继续前进
-                    if currP - lastP < self.Tmin:
-                        continue
-                    # 判断是否超过switchP,切换主除数和次除数
-                    if currP - lastP > self.switchP:
-                        self.D, self.second_D = self.second_D // 2, self.D
-                    # 计算初始窗口的哈希值
-                    hash_value = rolling_hash(buffer)
-                    # 判断是否满足主次除数的条件，记录备份断点和确定块边界
-                    if hash_value % self.second_D == self.second_D - 1:
-                        self.backupBreak = currP
-                    if hash_value % self.D == self.D - 1:
-                        self.breakpoint.append(currP)
-                        self.backupBreak = 0    # 重置备份断点
-                        lastP = currP   # 更新最后一个块的结束位置
-                        self.reset_divisor()
-                        continue
-                    # 判断是否达到最大阈值，如果有备份断点，使用备份断点作为块边界；否则，使用当前位置作为块边界
-                    if currP - lastP >= self.Tmax:
-                        if self.backupBreak:
-                            self.breakpoint.append(self.backupBreak)
-                            lastP = self.backupBreak
-                        else:
-                            self.breakpoint.append(currP)
-                            lastP = currP   # 继续前进，分块
-                        self.backupBreak = 0    # 重置备份断点
-                        self.reset_divisor()
-                if lastP < file_size:  # 确保最后一个块被添加
-                    self.breakpoint.append(file_size)
-        except Exception as e:
-            print(f"分块错误: {str(e)}")
-            return None
-        return self.breakpoint
-
-
-def calculate_chunk_hash(file_path, breakpoints):
-    """
-    计算文件各块的哈希值
-    :param file_path: 文件路径
-    :param breakpoints: 断点列表
-    :return: 顺序块哈希值列表
-    """
-    chunks_hashes = []
-    try:
+    def chunking(self, file_path, end, start=0):
         with open(file_path, 'rb') as f:
-            for i in range(len(breakpoints)-1):
-                content = f.read(breakpoints[i+1] - breakpoints[i])
-                chunks_hashes.append(hash256(content))
-        return chunks_hashes
-    except Exception as e:
-        print(f"计算哈希值错误:{str(e)}")
-        return[]
+            start += self.min_chunk_size
+            f.seek(start - self.window_size)
+            new_chunk = True  # 新块判断
+            change_d = False  # 除数切换判断
+            while end - start > self.min_chunk_size:
+                # 进入块判断
+                if new_chunk:
+                    f.read(self.min_chunk_size-self.window_size)  #
+                    content = f.read(self.window_size)
+                    new_chunk = False
+                else:
+                    content = content[1:] + f.read(1)
+                # 计算hash值，判断是否更换除数
+                hash_int = self.hash(content)
+                current_d = self.minor_d if change_d else self.main_d
+                # 判断断点
+                if hash_int % current_d == self.R and start - self.breakpoint[-1] >= self.min_chunk_size:
+                    self.breakpoint.append(start + self.window_size - 1)
+                    start = f.tell() + self.min_chunk_size
+                    new_chunk = True
+                else:
+                    start += self.footer_size
+                # 如果到达最大块尺寸，则切换除数并重新设置断点D--d
+                if start - self.breakpoint[-1] >= self.max_chunk_size:
+                    change_d = not change_d
+                    new_chunk = True
+                    # 如果都无法设置断点，那么将最大块作为断点
+                    if change_d:
+                        start = self.breakpoint[-1]
+                        f.seek(start)
+                    else:
+                        self.breakpoint.append(f.tell() - 1)
+                        start = f.tell()
+            self.breakpoint.append(end - 1)
+
+
+def gat_hash(breakpoints, path):
+    hasher = []
+    with open(path, 'rb') as f:
+        for i in range(len(breakpoints) - 1):
+            content = f.read(breakpoints[i + 1] - breakpoints[i])
+            hasher.append(hash256(content))
+    return hasher  # 返回hash列表
 
 
 def hash256(content):
     hash_256 = hashlib.sha256(content)
-    return int(hash_256.hexdigest(), 16)
+    return hash_256.hexdigest()
+
+
+def hashMD5(content):
+    hash_md5 = hashlib.md5(content)
+    return int(hash_md5.hexdigest(), 16)
 
 
 def rolling_hash(content):
@@ -125,10 +100,10 @@ def moving(unique_chunks, unique_hashes, tar):
     :param tar: 源文件路径
     :return: 操作是否成功
     """
-    extension = os.path.splitext(tar)[1]  # 文件扩展名
+    extension = os.path.splitext(tar)[1]  # 文件扩展名.txt
     target_files = defaultdict(list)  # 目标文件字典，key为目标文件路径，value为数据列表，默认值为[]
     with open(tar, 'rb') as f:
-        mm = mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_WRITE)
+        mm = mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ)
         for i in range(len(unique_chunks)):
             data = mm[unique_chunks[i][0]:unique_chunks[i][1]]  # 从映射内存读取数据
             dir_path = f"D:/try/path/{unique_hashes[i][0:2]}/{unique_hashes[i][2:4]}/{unique_hashes[i][-4:]}"
@@ -137,14 +112,14 @@ def moving(unique_chunks, unique_hashes, tar):
         mm.close()  # 关闭映射文件
     # 写入目标文件
     for filename, datas in target_files.items():
-        with open(filename, 'ab') as target_file:
+        with open(filename, 'wb') as target_file:
             target_file.write(b''.join(datas))
 
 
 def store(hashes, file_path):
-    with open(file_path, 'wb') as f:
+    with open(file_path, 'rb') as f:
         content = f.read()
-        file_hash = hash256(content)
+        file_hash = hashMD5(content)
         extension = os.path.splitext(file_path)[1]
     db_config = {
         "host": "localhost",
@@ -154,15 +129,22 @@ def store(hashes, file_path):
     }
     try:
         # 连接数据库
-        con = mysql.connector.connect(**db_config)
-        cur = con.cursor(dictionary=True)
-        file_tree = file_hash_tree.FileHashTree(con, cur)
-        hash_tree = file_hash_tree.HashTree(con, cur)
+        con1 = mysql.connector.connect(**db_config)
+        cur1 = con1.cursor(dictionary=True)
+        file_tree = file_hash_tree.FileHashTree(con1, cur1)
         file_tree.add(file_hash, hashes)
+        cur1.close()
+        con1.close()
+        con2 = mysql.connector.connect(**db_config)
+        cur2 = con2.cursor()
+        hash_tree = file_hash_tree.HashTree(con2, cur2)
         for hash_value in hashes:
-            hash_tree.add_file(hash_value, extension)
-        cur.close()
-        con.close()
+            tp = len(str(hash_value))
+            print()
+            hash_tree.add_file(str(hash_value), extension)
+        cur2.close()
+        con2.close()
+
     except Exception as e:
         print(f"连接数据库失败: {str(e)}")
 
@@ -175,14 +157,12 @@ def deduplicate(file1_path, file2_path):
     :return: 不重复的块信息列表
     """
     # 创建源文件和目标文件分块对象， 获取所有块的哈希值
-    root_fs = TTTDS()
-    target_fs = TTTDS()
-    root_fs.init(file1_path)
-    target_fs.init(file2_path)
+    root_fs = TTTDS(file1_path)
+    target_fs = TTTDS(file2_path)
     r_points = root_fs.back_point()
     t_points = target_fs.back_point()
-    r_hashes = calculate_chunk_hash(file1_path, r_points)
-    t_hashes = calculate_chunk_hash(file2_path, t_points)  # 目标文件块哈希值列表
+    r_hashes = gat_hash(r_points, file1_path)
+    t_hashes = gat_hash(t_points, file2_path)  # 目标文件块哈希值列表
 
     unique_chunks = []  # 唯一块前后断点列表
     unique_hashes = []  # 唯一块哈希值列表
@@ -204,7 +184,12 @@ def deduplicate(file1_path, file2_path):
         store(t_hashes, file2_path)
         for feature in features:
             feature.result()
-    os.remove(file2_path)
+    # os.remove(file2_path)
 
+#
 # if __name__ == '__main__':
-#     测试代码
+#     file1_path = "D:/try/2.txt"
+#     file2_path = "D:/try/3.txt"
+#     deduplicate(file1_path, file2_path)
+#     print("Deduplication completed.")
+

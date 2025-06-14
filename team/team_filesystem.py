@@ -191,7 +191,7 @@ class FileManager:
         except Exception as e:
             print(f"error: {e}")
             return
-        team_pubulicate.delicate(source_path, destination_path)
+        team_pubulicate.deduplicate(source_path, destination_path)
         print(f"success: delicate {source_name} to {destination_name}")
 
     def parse_command(self, command):

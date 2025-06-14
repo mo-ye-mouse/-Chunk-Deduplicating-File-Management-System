@@ -19,13 +19,6 @@ class FileHashTree:
         self.conn = con
         self.cursor = cursor
 
-    def close(self) -> None:
-        """关闭数据库连接"""
-        if self.cursor:
-            self.cursor.close()
-        if self.conn:
-            self.conn.close()
-
     def add(self, data_hash, data_list: List[Any]):
         """
         添加数据列表，返回该数据列表的哈希值
@@ -43,7 +36,7 @@ class FileHashTree:
 
         # 插入或更新数据
         insert_sql = """
-        INSERT INTO hash_data (data_hash, data_content)
+        INSERT INTO file_hash_tree (data_hash, data_content)
         VALUES (%s, %s)
         ON DUPLICATE KEY UPDATE data_content = VALUES(data_content)
         """
@@ -60,7 +53,7 @@ class FileHashTree:
         Returns:
             原始数据列表，如果未找到则返回None
         """
-        select_sql = "SELECT data_content FROM hash_data WHERE data_hash = %s"
+        select_sql = "SELECT data_content FROM file_hash_tree WHERE data_hash = %s"
         self.cursor.execute(select_sql, (data_hash,))
         result = self.cursor.fetchone()
 
