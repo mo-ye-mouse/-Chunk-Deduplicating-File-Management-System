@@ -18,9 +18,6 @@ class TTTDS:
     def init(self, file_path):
         self.file_path = file_path
 
-    def back_point(self):
-        return self.breakpoint
-
     def reset_divisor(self):
         # 恢复主除数和次除数的原始值
         self.D = 540
@@ -68,9 +65,12 @@ class TTTDS:
                             lastP = currP   # 继续前进，分块
                         self.backupBreak = 0    # 重置备份断点
                         self.reset_divisor()
+                if lastP < file_size:  # 确保最后一个块被添加
+                    self.breakpoint.append(file_size)
         except Exception as e:
             print(f"分块错误: {str(e)}")
             return None
+        return self.breakpoint
 
 
 def delicate(path1, path2):
