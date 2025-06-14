@@ -41,6 +41,7 @@ class TTTDS:
                         break
                     buffer = buffer[1:] + byte
                     currP += 1   # 更新当前位置
+                    # 判断是否达到最小阈值，没有则currP继续前进
                     if currP - lastP < self.Tmin:
                         continue
                     # 判断是否超过switchP,切换主除数和次除数
@@ -53,8 +54,8 @@ class TTTDS:
                         self.backupBreak = currP
                     if hash_value % self.D == self.D - 1:
                         self.breakpoint.append(currP)
-                        self.backupBreak = 0
-                        self.lastP = currP
+                        self.backupBreak = 0    # 重置备份断点
+                        lastP = currP   # 更新最后一个块的结束位置
                         self.reset_divisor()
                         continue
                     # 判断是否达到最大阈值，如果有备份断点，使用备份断点作为块边界；否则，使用当前位置作为块边界
@@ -64,8 +65,8 @@ class TTTDS:
                             lastP = self.backupBreak
                         else:
                             self.breakpoint.append(currP)
-                            lastP = currP
-                        self.backupBreak = 0
+                            lastP = currP   # 继续前进，分块
+                        self.backupBreak = 0    # 重置备份断点
                         self.reset_divisor()
         except Exception as e:
             print(f"分块错误: {str(e)}")
