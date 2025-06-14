@@ -32,9 +32,9 @@ class TTTDS:
 
     def chunking(self, file_path):
         file_size = os.path.getsize(file_path)
-        buffer = bytearray(self.window)     # 读取初始窗口数据
-        lastP = 0
-        currP = 0
+        buffer = bytearray(self.window)     # 创建一个字节数组，大小为滑动窗口大小
+        lastP = 0   # 初始化上一个块的结束位置为 0
+        currP = 0   # 初始化当前位置为 0
         try:
             with open(file_path, 'rb') as f:
                 f.seek(lastP)          # 移动指针到上一个块的结束位置
@@ -42,38 +42,37 @@ class TTTDS:
                 currP = self.window    # 当前位置设置为窗口大小
                 while currP < file_size:
                     byte = f.read(1)
-                    if not byte:
+                    if not byte:    # 如果读取到文件末尾，则退出循环
                         break
-                    buffer = buffer[1:] + byte
+                    buffer = buffer[1:] + byte  # 更新缓冲区，移除第一个字节，添加新读取的字节
                     currP += 1   # 更新当前位置
-                    # 判断是否达到最小阈值，没有则currP继续前进
+                    # 判断是否达到最小阈值，小于则currP继续前进
                     if currP - lastP < self.Tmin:
                         continue
                     # 判断是否超过switchP,切换主除数和次除数
                     if currP - lastP > self.switchP:
                         self.D, self.second_D = self.second_D // 2, self.D
-                    # 计算初始窗口的哈希值
-                    hash_value = rolling_hash(buffer)
-                    # 判断是否满足主次除数的条件，记录备份断点和确定块边界
+                    hash_value = rolling_hash(buffer)   # 计算缓冲区的哈希值
+                    # 判断是否满足主、次除数的条件，记录备份断点和确定块边界
                     if hash_value % self.second_D == self.second_D - 1:
-                        self.backupBreak = currP
+                        self.backupBreak = currP    # 记录备份断点
                     if hash_value % self.D == self.D - 1:
-                        self.breakpoint.append(currP)
+                        self.breakpoint.append(currP)   # 将当前位置添加到断点列表
                         self.backupBreak = 0    # 重置备份断点
-                        lastP = currP   # 更新最后一个块的结束位置
+                        lastP = currP   # 更新上一个块的结束位置
                         self.reset_divisor()
                         continue
-                    # 判断是否达到最大阈值，如果有备份断点，使用备份断点作为块边界；否则，使用当前位置作为块边界
+                    # 判断是否达到最大阈值
                     if currP - lastP >= self.Tmax:
-                        if self.backupBreak:
+                        if self.backupBreak:    # 如果有备份断点，使用备份断点作为块边界
                             self.breakpoint.append(self.backupBreak)
                             lastP = self.backupBreak
-                        else:
+                        else:   # 否则，使用当前位置作为块边界
                             self.breakpoint.append(currP)
                             lastP = currP   # 继续前进，分块
                         self.backupBreak = 0    # 重置备份断点
                         self.reset_divisor()
-                if lastP < file_size:  # 确保最后一个块被添加
+                if lastP < file_size:    # 指针可能未到达文件末尾，确保最后一个块被添加
                     self.breakpoint.append(file_size)
         except Exception as e:
             print(f"分块错误: {str(e)}")
