@@ -1,11 +1,7 @@
 import hashlib
-import os
-from collections import defaultdict
-import file_hash_tree
 from concurrent.futures import ThreadPoolExecutor
-import mmap
-import mysql.connector
-
+import os
+from sys import orig_argv
 
 class TTTDS:
     def __init__(self):
@@ -17,10 +13,7 @@ class TTTDS:
         self.second_D = 270  # 次除数
         self.breakpoint = [0]
         self.backupBreak = 0
-        self.switchP = 1600   # 切换参数
-
-    def back_point(self):
-        return self.breakpoint
+        self.switchP = 1600 # 切换参数
 
     def init(self, file_path):
         self.file_path = file_path
@@ -81,130 +74,22 @@ class TTTDS:
         return self.breakpoint
 
 
-def calculate_chunk_hash(file_path, breakpoints):
-    """
-    计算文件各块的哈希值
-    :param file_path: 文件路径
-    :param breakpoints: 断点列表
-    :return: 顺序块哈希值列表
-    """
-    chunks_hashes = []
-    try:
-        with open(file_path, 'rb') as f:
-            for i in range(len(breakpoints)-1):
-                content = f.read(breakpoints[i+1] - breakpoints[i])
-                chunks_hashes.append(hash256(content))
-        return chunks_hashes
-    except Exception as e:
-        print(f"计算哈希值错误:{str(e)}")
-        return[]
-
-
-def hash256(content):
-    hash_256 = hashlib.sha256(content)
-    return int(hash_256.hexdigest(), 16)
-
+def delicate(path1, path2):
+    # 去重
+    pass
 
 def rolling_hash(content):
     window_size = 48  # 固定窗口大小
     position = 0  # 固定起始位置
+    base = 256  # 字符集大小
+    prime = 101  # 用于取模的素数
     h = 1
     for _ in range(window_size - 1):
-        h = (h * 256) % 101
+        h = (h * base) % prime
     hash_value = 0
-    for byte in content[:position + window_size]:
-        hash_value = (256 * hash_value + byte) % 101
+    for byte in content[position:position + window_size]:
+        hash_value = (base * hash_value + byte) % prime
     return hash_value
-
-
-def moving(unique_chunks, unique_hashes, tar):
-    """
-    根据唯一块列表将文件块从源文件复制到目标文件，然后删除源文件
-    :param unique_hashes:
-    :param unique_chunks: 唯一块的位置列表，每个元素是一个元组(start_pos,end_pos)
-    :param tar: 源文件路径
-    :return: 操作是否成功
-    """
-    extension = os.path.splitext(tar)[1]  # 文件扩展名
-    target_files = defaultdict(list)  # 目标文件字典，key为目标文件路径，value为数据列表，默认值为[]
-    with open(tar, 'rb') as f:
-        mm = mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_WRITE)
-        for i in range(len(unique_chunks)):
-            data = mm[unique_chunks[i][0]:unique_chunks[i][1]]  # 从映射内存读取数据
-            dir_path = f"D:/try/path/{unique_hashes[i][0:2]}/{unique_hashes[i][2:4]}/{unique_hashes[i][-4:]}"
-            target_path = os.path.join(dir_path, f"{unique_hashes[i]}.{extension}")  # 目标文件路径
-            target_files[target_path].append(data)
-        mm.close()  # 关闭映射文件
-    # 写入目标文件
-    for filename, datas in target_files.items():
-        with open(filename, 'ab') as target_file:
-            target_file.write(b''.join(datas))
-
-
-def store(hashes, file_path):
-    with open(file_path, 'wb') as f:
-        content = f.read()
-        file_hash = hash256(content)
-        extension = os.path.splitext(file_path)[1]
-    db_config = {
-        "host": "localhost",
-        "user": "root",
-        "password": "",
-        "database": "sha256_directories"
-    }
-    try:
-        # 连接数据库
-        con = mysql.connector.connect(**db_config)
-        cur = con.cursor(dictionary=True)
-        file_tree = file_hash_tree.FileHashTree(con, cur)
-        hash_tree = file_hash_tree.HashTree(con, cur)
-        file_tree.add(file_hash, hashes)
-        for hash_value in hashes:
-            hash_tree.add_file(hash_value, extension)
-        cur.close()
-        con.close()
-    except Exception as e:
-        print(f"连接数据库失败: {str(e)}")
-
-
-def deduplicate(file1_path, file2_path):
-    """
-    比较两个文件的块哈希值，找出不重复的块
-    :param file1_path: 第一个文件路径
-    :param file2_path: 第二个文件路径
-    :return: 不重复的块信息列表
-    """
-    # 创建源文件和目标文件分块对象， 获取所有块的哈希值
-    root_fs = TTTDS()
-    target_fs = TTTDS()
-    root_fs.init(file1_path)
-    target_fs.init(file2_path)
-    r_points = root_fs.back_point()
-    t_points = target_fs.back_point()
-    r_hashes = calculate_chunk_hash(file1_path, r_points)
-    t_hashes = calculate_chunk_hash(file2_path, t_points)  # 目标文件块哈希值列表
-
-    unique_chunks = []  # 唯一块前后断点列表
-    unique_hashes = []  # 唯一块哈希值列表
-    # 线程池处理去重
-    with ThreadPoolExecutor(max_workers=6) as executor:
-        features = []
-        for i in range(len(t_hashes)):
-            if not t_hashes[i] in r_hashes:
-                unique_chunks.append((t_points[i], t_points[i+1]))
-                unique_hashes.append(t_hashes[i])
-            if len(unique_chunks) == 20:
-                feature = executor.submit(moving, unique_chunks, unique_hashes, file2_path)
-                features.append(feature)
-                unique_chunks.clear()
-        if len(unique_chunks) > 0:
-            feature = executor.submit(moving, unique_chunks, unique_hashes, file2_path)
-            features.append(feature)
-        # 存储目录
-        store(t_hashes, file2_path)
-        for feature in features:
-            feature.result()
-    os.remove(file2_path)
 
 # if __name__ == '__main__':
 #     测试代码
