@@ -121,7 +121,7 @@ class FileSystem:
 
     def delicate(self, path1, path2):
         delicate = moye_depublicate.Delicate()
-        delicate.delicate(path1, path2)
+        delicate.upload(path1, path2)
 
     def tackle(self, message):
         if message[0] in self.menu:

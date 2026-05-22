@@ -188,6 +188,7 @@ class FileManager:
         try:
             source_path = os.path.join(self.current_dir, source_name)
             destination_path = os.path.join(self.current_dir, destination_name)
+            return "success: delicate " + source_name + " to " + destination_name
         except Exception as e:
             print(f"error: {e}")
             return

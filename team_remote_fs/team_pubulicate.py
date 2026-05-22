@@ -32,7 +32,7 @@ class TTTDS:
             while end - start > self.min_chunk_size:
                 # 进入块判断
                 if new_chunk:
-                    f.read(self.min_chunk_size-self.window_size)  #
+                    f.read(self.min_chunk_size-self.window_size)
                     content = f.read(self.window_size)
                     new_chunk = False
                 else:

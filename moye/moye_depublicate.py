@@ -30,11 +30,11 @@ class Chunking:
             while end - start > self.min_chunk_size:
                 # 进入块判断
                 if new_chunk:
-                    f.read(self.min_chunk_size-self.window_size)
+                    f.read(self.min_chunk_size-self.window_size)  #
                     content = f.read(self.window_size)
                     new_chunk = False
                 else:
-                    content = content[self.footer_size:] + f.read(self.footer_size)
+                    content = content[1:] + f.read(1)
                 # 计算hash值，判断是否更换除数
                 hash_int = self.hash(content)
                 current_d = self.minor_d if change_d else self.main_d
@@ -45,7 +45,7 @@ class Chunking:
                     new_chunk = True
                 else:
                     start += self.footer_size
-                # 如果到达最大块尺寸，则切换除数并重新设置断点
+                # 如果到达最大块尺寸，则切换除数并重新设置断点D--d
                 if start - self.breakpoint[-1] >= self.max_chunk_size:
                     change_d = not change_d
                     new_chunk = True
@@ -108,7 +108,6 @@ class Delicate:
         hasher = []
         with open(path, 'rb') as f:
             for i in range(len(breakpoints)-1):
-                f.seek(breakpoints[i])
                 content = f.read(breakpoints[i+1]-breakpoints[i])
                 hasher.append(self.hasher(content))
         return hasher  # 返回hash列表
@@ -207,3 +206,5 @@ def rolling_hash(content):
     #                     i += 1
     #         else:
     #             i += 1
+
+
